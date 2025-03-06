@@ -95,14 +95,4 @@ pip install -r requirements.txt
 - Create a dashboard for visualizing data quality metrics
 - Integrate with data preprocessing workflows for seamless analysis
 
-## 📝 License
-MIT License
-
-## 👤 Contact
-For questions or feedback about this project, please contact:
-- Email: your.email@example.com
-- GitHub: [your-github-username](https://github.com/your-username)
-
----
-
 🚀 **Ready for data analysis! Feel free to contribute or report any issues.**
