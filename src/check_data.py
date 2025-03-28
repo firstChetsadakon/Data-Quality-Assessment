@@ -31,7 +31,13 @@ def check_total_spent(row):
     
     elif pd.isna(row['Price Per Unit']) or pd.isna(row['Quantity']):
         return 'CANT CHECK'  # ถ้า Price Per Unit หรือ Quantity เป็น NaN ให้ return CANT CHECK
+
+    elif row.get('Price Per Unit_validity') == 'CANT CHECK' or row.get('Quantity_validity') == 'CANT CHECK':
+        return 'CANT CHECK'  # ถ้า Price Per Unit_validity หรือ Quantity_validity เป็น 'CANT CHECK' ให้ return 'CANT CHECK'
     
+    elif not (isinstance(row['Price Per Unit'], (int, float)) and isinstance(row['Quantity'], (int, float))):
+        return 'CANT CHECK'  # ถ้า Price Per Unit หรือ Quantity ไม่ใช่ตัวเลข ให้ return CANT CHECK
+
     # ตรวจสอบว่า Total Spent = Price Per Unit * Quantity
     elif row['Total Spent'] == row['Price Per Unit'] * row['Quantity']:
         return True
@@ -63,14 +69,14 @@ def check_price_validity(row, master_price_df):
         return False  
 
     # 3. ตรวจสอบว่ามี Item, Transaction Date และ Transaction Date_vailidity เป็น True หรือไม่
-    elif pd.isna(item) or pd.isna(transaction_date) or (row.get('Transaction Date_vailidity') != True):
+    elif pd.isna(item) or pd.isna(transaction_date) or (row.get('Transaction Date_validity') is not True):
         return 'CANT CHECK'  
 
     else:
         # 4. ตรวจสอบว่า Item มีอยู่ใน master_price_df หรือไม่
         item_prices = master_price_df[master_price_df['Item'] == item]
         if item_prices.empty:
-            return 'CANT CHECK'
+            return False
 
         # 5. ตรวจสอบว่า Transaction Date อยู่ในช่วง Start_date - End_date หรือไม่
         valid_prices = item_prices[
@@ -79,11 +85,10 @@ def check_price_validity(row, master_price_df):
         ]
 
         if valid_prices.empty:
-            return 'CANT CHECK'  # ไม่มีราคาสำหรับช่วงเวลานั้น
+            return False  # ไม่มีราคาสำหรับช่วงเวลานั้น
 
         # 6. ตรวจสอบว่า Price Per Unit ตรงกับ master data หรือไม่
         return price in valid_prices['Price Per Unit'].values
-
 
 
 def add_validity_column(df, col, rule):
@@ -109,9 +114,9 @@ def add_validity_column(df, col, rule):
         if rule == 'datetime_format':  
             # ตรวจสอบว่าเป็นวันที่รูปแบบ YYYY-MM-DD หรือไม่
             df[f'{col}_validity'] = df[col].apply(
-                                        lambda x: np.nan if pd.isna(x) 
-                                        else (bool(re.fullmatch(r'\d{4}-\d{2}-\d{2}', str(x))) and is_valid_date(str(x)))
-                                    )
+                                            lambda x: True if isinstance(x, pd.Timestamp) 
+                                            else (np.nan if pd.isna(x) else (bool(re.fullmatch(r'\d{4}-\d{2}-\d{2}', str(x))) and is_valid_date(str(x))))
+                                        )
         elif rule == 'integer_non_negative':  
             # ต้องเป็นจำนวนเต็ม (int) และห้ามติดลบ
             df[f'{col}_validity'] = df[col].apply(
@@ -197,7 +202,6 @@ def check_data_vailidy(data,master_price_df):
         'Computers and electric accessories': "CEA"
     }
 
-
     # Rule ในการ Check Validity
     validation_rules = {
         'Transaction ID': r'TXN_\d{7}',  # ต้องเป็น TXN_ ตามด้วยเลข 7 ตัว (ใช้ regex)
@@ -213,6 +217,11 @@ def check_data_vailidy(data,master_price_df):
 
 
     output = data.copy()
+
+    #=============================================================
+    # Step 0 Completeness: ตรวจ Check Uniqueness
+    #=============================================================
+    output = check_uniqueness(output)
 
     #=============================================================
     # Step 1 Completeness: ตรวจ Check Missing Value ในแต่ละ Column
@@ -231,4 +240,6 @@ def check_data_vailidy(data,master_price_df):
     output['Price Per Unit_validity'] = output.apply(check_price_validity,master_price_df = master_price_df,axis=1)
     output['Total Spent_validity'] = output.apply(check_total_spent, axis=1)
     return output
+
+
 
